@@ -1,92 +1,43 @@
-# Unscented Kalman Filter Project Starter Code
-Self-Driving Car Engineer Nanodegree Program
+# Unscented Kalman Filter Project
+Udacity Self-Driving Car Engineer Nanodegree Program: Term 2
+[Master project repo](https://github.com/udacity/CarND-Unscented-Kalman-Filter-Project)
 
-In this project utilize an Unscented Kalman Filter to estimate the state of a moving object of interest with noisy lidar and radar measurements. Passing the project requires obtaining RMSE values that are lower that the tolerance outlined in the project rubric. 
+This project implements an "unscented" [Kalman filter](https://www.seas.harvard.edu/courses/cs281/papers/unscented.pdf) (UKF) that uses lidar and radar measurements to track a moving vehicle. Because two types of sensor measurements are used, it is an example of [sensor fusion](https://en.wikipedia.org/wiki/Sensor_fusion). The UKF is an improvement on the Extended Kalman Filter (EKF), since it is better able to handle non-linear system dynamics. (Apparently the name is a joke about how the EKF "stinks").
 
-This project involves the Term 2 Simulator which can be downloaded [here](https://github.com/udacity/self-driving-car-sim/releases)
+This project uses the Term 2 Simulator which can be downloaded [here](https://github.com/udacity/self-driving-car-sim/releases).
 
-This repository includes two files that can be used to set up and intall [uWebSocketIO](https://github.com/uWebSockets/uWebSockets) for either Linux or Mac systems. For windows you can use either Docker, VMware, or even [Windows 10 Bash on Ubuntu](https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/) to install uWebSocketIO. Please see [this concept in the classroom](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/16cf4a78-4fc7-49e1-8621-3450ca938b77) for the required version and installation scripts.
+## Project structure
 
-Once the install for uWebSocketIO is complete, the main program can be built and ran by doing the following from the project top directory.
+The project consists of the following primary components:
+* src/main.cpp - Responsible for interfacing with the simulator and reading (simulated) lidar and radar measurement data
+* src/ukf.cpp, .h - Responsible for implementing the UKF and holding all values associated with it
+* src/tools.cpp, .h - Responsible for calculation of RMSE
 
-1. mkdir build
-2. cd build
-3. cmake ..
-4. make
-5. ./UnscentedKF
+## Kalman filter concepts
 
-Tips for setting up your environment can be found [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
+In this application we use a mathematical model of the motion of the tracked vehicle that assumes it is moving with a constant turn rate and speed (the magnitude of velocity), a.k.a. CTRV. This leads us to using a 5-dimensional state space to describe the vehicle (x and y position, velocity magnitude, yaw angle, and yaw angle rate of change). The equations of motion in this situation are non-linear, as is the coordinate system of one of our sensors (radar). The EKF we used previously does not handle this nonlinearity well.
 
-Note that the programs that need to be written to accomplish the project are src/ukf.cpp, src/ukf.h, tools.cpp, and tools.h
+The UKF is a computationally efficient way of dealing with the nonlinearities. It begins by defining "sigma points", which are representative points in phase space that we will propagate through the equations of motion to estimate how the probability distribution of the vehicle's state changes in time. We use two sigma points for each dimension of the problem, plus an additional one identical to the current estimated state. In order to handle the nonlinear process noise we "augment" the problem with two additional dimensions (addressing linear and yaw angle acceleration noise). 
 
-The program main.cpp has already been filled out, but feel free to modify it.
+The function ProcessMeasurement() initializes the UKF with the first measurement, and then handles each successive measurement by predicting the current state and updating our state belief using the algorithm appropriate for the relevant sensor. The prediction step propagates the sigma points through the equations of motion and extracts an estimated covariance and predicted state; the update step re-uses the sigma points to project into the measurement coordinate space and calculate the state and covariance update.
 
-Here is the main protcol that main.cpp uses for uWebSocketIO in communicating with the simulator.
+## Using NIS to tune noise parameters
 
+A key part of the project is tuning the noise parameters for linear and yaw acceleration. We can do this with trial-and-error, using the RMSE that results from the UKF output in the simulator and the ground truth. A helpful method for this is to calculate the "normalized innovation squared" (NIS) - essentially what we learn on average from each measurement, or equivalently how much we have to correct our estimated state. 
 
-INPUT: values provided by the simulator to the c++ program
-
-["sensor_measurement"] => the measurment that the simulator observed (either lidar or radar)
+I adjusted these parameters by first choosing physically reasonable numbers and then tuning them to find RMSE improvements. For linear acceleration it's reasonable to choose a value less than 1g (9.8 m/s^22) since most cars won't have acceleration noise that large. For yaw acceleration it's reasonable to choose a relatively small fraction of 2pi/s^2, since most cars won't swing their front rapidly through a full circle in that amount of time. The values I searched for and ultimately chose are listed below.
 
 
-OUTPUT: values provided by the c++ program to the simulator
+| Lin. ac. ns. (m/s^2) | Yaw ac. ns. (rad/s^2) | RMSE(x) | RMSE (y) | RMSE(vx) | RMSE(vy) | NIS(L) | NIS(r) |
+|:--------------------:|:---------------------:|:-------:|:--------:|:--------:|:--------:|:------:|:------:|
+| 3.0				   | 0.30 				   | 0.0786  | 0.0851   | 0.3307   | 0.3067   | 0.0103 | 0.0145 |
+| 4.5				   | 0.30 				   | 0.0807  | 0.0873   | 0.3490   | 0.3283   | 0.0105 | 0.0143 |
+| 1.5				   | 0.30 				   | 0.0741  | 0.0822   | 0.3100   | 0.2836   | 0.0100 | 0.0155 |
+| 1.0				   | 0.30 				   | 0.0712  | 0.0816   | 0.3037   | 0.2761   | 0.0097 | 0.0161 |
+| 0.5				   | 0.30 				   | 0.0665  | 0.0839   | 0.2997   | 0.2710   | 0.0093 | 0.0166 |
+| 1.0				   | 0.15 				   | 0.0892  | 0.0919   | 0.3460   | 0.3196   | 0.0143 | 0.0154 |
+| 1.0				   | 0.60 				   | 0.0668  | 0.0818   | 0.2937   | 0.2669   | 0.0083 | 0.0164 |
+| 1.0				   | 1.00 				   | 0.0660  | 0.0830   | 0.2973   | 0.2726   | 0.0080 | 0.0164 |
+| 2.0				   | 0.60 				   | 0.0720  | 0.0824   | 0.3055   | 0.2797   | 0.0090 | 0.0157 |
 
-["estimate_x"] <= kalman filter estimated position x
-["estimate_y"] <= kalman filter estimated position y
-["rmse_x"]
-["rmse_y"]
-["rmse_vx"]
-["rmse_vy"]
-
----
-
-## Other Important Dependencies
-* cmake >= 3.5
-  * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1 (Linux, Mac), 3.81 (Windows)
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools](https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-
-## Basic Build Instructions
-
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./UnscentedKF` Previous versions use i/o from text files.  The current state uses i/o
-from the simulator.
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html) as much as possible.
-
-## Generating Additional Data
-
-This is optional!
-
-If you'd like to generate your own radar and lidar data, see the
-[utilities repo](https://github.com/udacity/CarND-Mercedes-SF-Utilities) for
-Matlab scripts that can generate additional data.
-
-## Project Instructions and Rubric
-
-This information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/c3eb3583-17b2-4d83-abf7-d852ae1b9fff/concepts/f437b8b0-f2d8-43b0-9662-72ac4e4029c1)
-for instructions and the project rubric.
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
-
+Conclusion of optimal parameters: linear ac.: 1.0 m/s^2; yaw ac.:: 0.6 rad/s^2.
