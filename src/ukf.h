@@ -79,6 +79,18 @@ public:
   ///* Total number of radar measurements
   int n_radar_measurements_;
 
+  ///* Lidar noise matrix
+  MatrixXd R_laser_;
+
+  ///* Radar noise matrix
+  MatrixXd R_radar_;
+
+  ///* Process noise matrix
+  MatrixXd R_process_;
+
+  ///* Projection matrix for lidar
+  MatrixXd H_laser_;
+
   /**
    * Constructor
    */

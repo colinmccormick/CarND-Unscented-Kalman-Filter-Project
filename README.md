@@ -19,7 +19,9 @@ In this application we use a mathematical model of the motion of the tracked veh
 
 The UKF is a computationally efficient way of dealing with the nonlinearities. It begins by defining "sigma points", which are representative points in phase space that we will propagate through the equations of motion to estimate how the probability distribution of the vehicle's state changes in time. We use two sigma points for each dimension of the problem, plus an additional one identical to the current estimated state. In order to handle the nonlinear process noise we "augment" the problem with two additional dimensions (addressing linear and yaw angle acceleration noise). 
 
-The function ProcessMeasurement() initializes the UKF with the first measurement, and then handles each successive measurement by predicting the current state and updating our state belief using the algorithm appropriate for the relevant sensor. The prediction step propagates the sigma points through the equations of motion and extracts an estimated covariance and predicted state; the update step re-uses the sigma points to project into the measurement coordinate space and calculate the state and covariance update.
+The function ProcessMeasurement() initializes the UKF with the first measurement, and then handles each successive measurement by predicting the current state and updating our state belief using the algorithm appropriate for the relevant sensor. While the radar measurements need to be handled with the UKF, the lidar measurements can be handled with a simple linear Kalman filter, which is less computationally expensive.
+
+The prediction step propagates the sigma points through the equations of motion and extracts an estimated covariance and predicted state; the update step re-uses the sigma points to project into the measurement coordinate space and calculate the state and covariance update.
 
 ## Using NIS to tune noise parameters
 
@@ -28,7 +30,7 @@ A key part of the project is tuning the noise parameters for linear and yaw acce
 I adjusted these parameters by first choosing physically reasonable numbers and then tuning them to find RMSE improvements. For linear acceleration it's reasonable to choose a value less than 1g (9.8 m/s^22) since most cars won't have acceleration noise that large. For yaw acceleration it's reasonable to choose a relatively small fraction of 2pi/s^2, since most cars won't swing their front rapidly through a full circle in that amount of time. The values I searched for and ultimately chose are listed below.
 
 
-| Lin. ac. ns. (m/s^2) | Yaw ac. ns. (rad/s^2) | RMSE(x) | RMSE (y) | RMSE(vx) | RMSE(vy) | NIS(L) | NIS(r) |
+| Lin. ac. noise. (m/s^2) | Yaw ac. noise. (rad/s^2) | RMSE(x) | RMSE (y) | RMSE(vx) | RMSE(vy) | NIS(L) | NIS(R) |
 |:--------------------:|:---------------------:|:-------:|:--------:|:--------:|:--------:|:------:|:------:|
 | 3.0				   | 0.30 				   | 0.0786  | 0.0851   | 0.3307   | 0.3067   | 0.0103 | 0.0145 |
 | 4.5				   | 0.30 				   | 0.0807  | 0.0873   | 0.3490   | 0.3283   | 0.0105 | 0.0143 |
